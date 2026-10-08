@@ -1,44 +1,44 @@
 # anomaly-net
 
-**English** | [Русский](README.ru.md)
+**Русский** | [English](README.en.md)
 
-Log anomaly detector: an autoencoder (PyTorch → ONNX) over features expressed as z-scores against the server's own history. Two models: **SSH** (`auth.log`, ready to use) and **web traffic** (`model_v1`, synthetic data only so far).
+Детектор аномалий в логах: автоэнкодер (PyTorch → ONNX), признаки — z-score относительно истории самого сервера. Две модели: **SSH** (`auth.log`, готова к использованию) и **веб-трафик** (`model_v1`, пока только на синтетике).
 
-## Install (SSH detector on a Linux server)
+## Установка (SSH-детектор на Linux-сервер)
 
-Requirements: Linux, root, `python3` with the `venv` module, and `/var/log/auth.log` (Debian/Ubuntu; if logs go only to journald, install rsyslog).
+Требования: Linux, root, `python3` с модулем `venv`, лог `/var/log/auth.log` (Debian/Ubuntu; если логи идут только в journald, поставьте rsyslog).
 
 ```bash
 git clone https://github.com/loar32/anomaly-net.git
 cd anomaly-net
-sudo ./install.sh                                 # without Telegram
-# or with Telegram alerts and a language for messages (en or ru):
-sudo TG_TOKEN=<bot token> TG_CHAT=<chat id> ANOMALY_LANG=en ./install.sh
+sudo ./install.sh                                 # без Telegram
+# или с Telegram и языком сообщений (ru или en, по умолчанию ru):
+sudo TG_TOKEN=<токен бота> TG_CHAT=<chat_id> ANOMALY_LANG=en ./install.sh
 ```
 
-`install.sh` copies the files to `/opt/anomaly-net`, creates a venv, installs `numpy pandas onnxruntime`, adds a cron job that runs every 15 minutes, and finishes with a trial run over the current log. It is safe to re-run: the cron line is not duplicated and an existing `.env` (Telegram settings) is kept. Findings are appended to `/var/log/anomaly-net.log`.
+`install.sh` копирует файлы в `/opt/anomaly-net`, создаёт venv, ставит `numpy pandas onnxruntime`, добавляет в cron запуск раз в 15 минут и в конце делает пробный прогон по текущему логу. Повторный запуск безопасен: cron не дублируется, существующий `.env` с настройками Telegram сохраняется. Находки дописываются в `/var/log/anomaly-net.log`.
 
-Manual check: `cd /opt/anomaly-net && .venv/bin/python detect.py /var/log/auth.log` should print a line like `windows N, anomalous M`.
+Проверка вручную: `cd /opt/anomaly-net && .venv/bin/python detect.py /var/log/auth.log` — должна вывестись строка вида `окон N, аномальных M`.
 
-**Important:** `model_ssh.onnx` was calibrated on one server with constant background SSH noise (~35 failed logins per 5 minutes). On a quiet server it will raise many false alarms. Retrain on your own log (at least 4 days): put it in `logs/auth.log`, run `pip install -r requirements-train.txt`, then `python ssh.py`, and copy the new `model_ssh.onnx` and `model_ssh.json` to the install directory.
+**Важно:** `model_ssh.onnx` откалибрована на одном сервере с постоянным фоновым SSH-шумом (~35 неудачных входов за 5 минут). На тихом сервере будет много ложных тревог. Переобучите на своём логе (нужно не меньше 4 суток): положите его в `logs/auth.log`, выполните `pip install -r requirements-train.txt`, затем `python ssh.py` и скопируйте новые `model_ssh.onnx` и `model_ssh.json` в каталог установки.
 
-Parser tests: `python test_logs.py` (needs only numpy and pandas).
+Тесты парсера: `python test_logs.py` (нужны только numpy и pandas).
 
-## SSH model (`ssh.py`, `detect.py`)
+## SSH-модель (`ssh.py`, `detect.py`)
 
-Trained on a real `auth.log` from a server under constant SSH brute force (~15k failed logins per day); the normal state is that background noise. 5-minute windows, 6 features (attempts, unique IPs, share of non-existent users, username entropy, new IPs, top-IP share), z-scores from the first 3 days, autoencoder 6→3→6. Successful logins are not part of the model: they are a separate rule in `detect.py` ("login from a new IP").
+Обучена на реальном `auth.log` сервера под постоянным SSH-брутфорсом (~15 тыс. неудачных входов в сутки); нормой считается этот фоновый шум. Окна по 5 минут, 6 признаков (попытки, уникальные IP, доля несуществующих пользователей, энтропия логинов, новые IP, доля топ-IP), z-score по первым 3 суткам, автоэнкодер 6→3→6. Успешные входы в модель не входят: это отдельное правило в `detect.py` («вход с нового IP»).
 
-`python ssh.py` trains and writes `model_ssh.onnx` and `model_ssh.json` (threshold, mean/std). `python detect.py /var/log/auth.log` runs a log through the ONNX model; with `--recent 20` it reports only the last 20 minutes (this is what cron uses).
+`python ssh.py` обучает модель и пишет `model_ssh.onnx` и `model_ssh.json` (порог, mean/std). `python detect.py /var/log/auth.log` прогоняет лог через ONNX; с `--recent 20` показывает только последние 20 минут (так запускает cron).
 
-Result: over the whole log (1345 windows) 17 were flagged (1.3%). Synthetic bursts injected into real windows (brute force from 1 IP, a 200-IP botnet) are caught 100% of the time. Some alerts are quiet windows with a single attempt from a new IP — false alarms. There are no labeled real attacks in the log, so this does not measure real recall; one server only, transfer to others is untested.
+Результат: по всему логу (1345 окон) помечено 17 (1.3%). Искусственные всплески поверх реальных окон (брутфорс с 1 IP, ботнет с 200 IP) ловятся в 100% случаев. Часть срабатываний — тихие окна с одной попыткой с нового IP, это ложные тревоги. Размеченных реальных атак в логе нет, поэтому реальную полноту это не измеряет; сервер один, перенос на другие не проверен.
 
-## Web model (`train.py`)
+## Веб-модель (`train.py`)
 
-Trained on synthetic data: `pip install -r requirements-train.txt`, then `python train.py` (writes `model_v1.onnx` and `model_v1.json`). It learns the normal state only and is evaluated on servers it has not seen.
+Обучена на синтетике: `pip install -r requirements-train.txt`, затем `python train.py` (пишет `model_v1.onnx` и `model_v1.json`). Учится только на норме, проверяется на серверах, которых не видела.
 
-### Metrics v1 (held-out servers, threshold = 99th percentile of normal, bottleneck 8)
+### Метрики v1 (серверы вне обучения, порог — 99-й перцентиль нормы, bottleneck 8)
 
-| | autoencoder | isolation forest |
+| | автоэнкодер | isolation forest |
 |---|---|---|
 | FPR | 0.010 | 0.010 |
 | port_scan | 1.00 | 0.26 |
@@ -47,10 +47,10 @@ Trained on synthetic data: `pip install -r requirements-train.txt`, then `python
 | path_scanning | 1.00 | 0.72 |
 | credential_stuffing | 1.00 | 1.00 |
 | slow_exfiltration | 0.80 | 0.12 |
-| recall (all) | 0.97 | 0.55 |
+| recall (все) | 0.97 | 0.55 |
 
-Tested on synthetic scenarios only: port scan, brute force, traffic spike, path scanning, credential stuffing, slow exfiltration. In the synthetic normal traffic, features share a common load factor (requests, IPs, errors and entropy rise together); without such structure the autoencoder has nothing to compress — it either copies its input (bottleneck 16) or is unstable (recall 0.73–0.75). Real logs will look different; this is still to be verified.
+Проверено только на синтетических сценариях: port scan, brute force, traffic spike, path scanning, credential stuffing, slow exfiltration. В синтетической норме признаки связаны общим фактором нагрузки (запросы, IP, ошибки и энтропия растут вместе); без такой связи автоэнкодеру нечего сжимать — он либо копирует вход (bottleneck 16), либо работает нестабильно (recall 0.73–0.75). Реальные логи будут устроены иначе, это ещё предстоит проверить.
 
-## License
+## Лицензия
 
 MIT

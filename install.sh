@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Install the detector on a Linux server: ./install.sh [dir, default /opt/anomaly-net]
-# Needs: python3 with venv, root (cron and /var/log/auth.log).
-# Optional env: TG_TOKEN and TG_CHAT (Telegram alerts), ANOMALY_LANG=en|ru (message language, default en).
-# Установка детектора на Linux-сервер; те же переменные (язык сообщений: ANOMALY_LANG=ru).
+# Установка детектора на Linux-сервер: ./install.sh [каталог, по умолчанию /opt/anomaly-net]
+# Нужны: python3 с модулем venv, root (cron и чтение /var/log/auth.log).
+# Необязательно: TG_TOKEN и TG_CHAT (тревоги в Telegram), ANOMALY_LANG=ru|en (язык сообщений, по умолчанию ru).
 set -euo pipefail
 DEST="${1:-/opt/anomaly-net}"
 SRC="$(cd "$(dirname "$0")" && pwd)"
@@ -12,7 +11,7 @@ cp "$SRC"/{data.py,logs.py,ssh.py,detect.py,model_ssh.onnx,model_ssh.json,requir
 python3 -m venv "$DEST/.venv"
 "$DEST/.venv/bin/pip" install -q -r "$DEST/requirements.txt"
 
-LANG_UI="${ANOMALY_LANG:-en}"
+LANG_UI="${ANOMALY_LANG:-ru}"
 if [ -n "${TG_TOKEN:-}" ] && [ -n "${TG_CHAT:-}" ]; then
   printf 'TG_TOKEN=%s\nTG_CHAT=%s\nANOMALY_LANG=%s\n' "$TG_TOKEN" "$TG_CHAT" "$LANG_UI" > "$DEST/.env"; chmod 600 "$DEST/.env"
 elif [ ! -f "$DEST/.env" ]; then

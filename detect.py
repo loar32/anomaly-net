@@ -4,7 +4,7 @@ import json, os, sys, urllib.parse, urllib.request
 import numpy as np, onnxruntime as ort, pandas as pd
 from ssh import parse, windows, FEATS
 
-RU = os.environ.get("ANOMALY_LANG", "en").lower().startswith("ru")
+RU = os.environ.get("ANOMALY_LANG", "ru").lower().startswith("ru")
 T = dict(
     summary=("окон {n}, аномальных {m}", "windows {n}, anomalous {m}"),
     bad=("аномальных окон {n}, пик score {peak:.2f}, неудач {f}, IP {ips}",
