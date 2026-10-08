@@ -1,0 +1,37 @@
+{
+ "threshold": 0.009381087496876717,
+ "features": [
+  "req_count",
+  "uniq_ips",
+  "error_rate_4xx",
+  "error_rate_5xx",
+  "path_entropy",
+  "ua_entropy",
+  "new_ip_ratio",
+  "failed_login_count",
+  "distinct_ports_per_ip"
+ ],
+ "eps": 0.1,
+ "metrics": {
+  "autoencoder": {
+   "fpr": 0.01,
+   "port_scan": 1.0,
+   "brute_force": 1.0,
+   "traffic_spike": 1.0,
+   "path_scanning": 1.0,
+   "credential_stuffing": 1.0,
+   "slow_exfiltration": 0.797979797979798,
+   "recall_all": 0.9666666666666667
+  },
+  "isolation_forest": {
+   "fpr": 0.01,
+   "port_scan": 0.25571725571725573,
+   "brute_force": 1.0,
+   "traffic_spike": 0.15811088295687886,
+   "path_scanning": 0.7183908045977011,
+   "credential_stuffing": 0.9980430528375733,
+   "slow_exfiltration": 0.11717171717171718,
+   "recall_all": 0.549
+  }
+ }
+}
