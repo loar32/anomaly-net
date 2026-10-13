@@ -26,5 +26,5 @@ case "$LANG_UI" in
   *)   M1="Trial run:"; M2="Done. Findings are written to /var/log/anomaly-net.log (checked every 15 minutes).";;
 esac
 echo "$M1"
-ANOMALY_LANG="$LANG_UI" "$DEST/.venv/bin/python" "$DEST/detect.py" /var/log/auth.log | head -5
+ANOMALY_LANG="$LANG_UI" "$DEST/.venv/bin/python" "$DEST/detect.py" /var/log/auth.log
 echo "$M2"
