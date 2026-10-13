@@ -23,8 +23,9 @@ cut = int(len(Xn) * 0.9); perm = np.random.default_rng(0).permutation(len(Xn))
 Xfit, Xes = Xn[perm[:cut]], Xn[perm[cut:]]       # early stopping по норме train-серверов
 
 d = Xtr.shape[1]
-model = nn.Sequential(nn.Linear(d, 64), nn.ReLU(), nn.Linear(64, 8), nn.ReLU(),
-                      nn.Linear(8, 64), nn.ReLU(), nn.Linear(64, d)).to(dev)
+# узкое место 4 < 8 признаков: при 8 сеть может просто копировать вход (es-loss ≈ 0)
+model = nn.Sequential(nn.Linear(d, 64), nn.ReLU(), nn.Linear(64, 4), nn.ReLU(),
+                      nn.Linear(4, 64), nn.ReLU(), nn.Linear(64, d)).to(dev)
 opt = torch.optim.Adam(model.parameters(), 1e-3)
 T = lambda a: torch.tensor(a, device=dev)
 fit, es = T(Xfit), T(Xes)
@@ -45,12 +46,13 @@ print(f"эпох: {ep+1}, лучший es-loss: {best:.4f}, device: {dev}")
 def score(X):
     with torch.no_grad(): x = T(X); return ((model(x) - x) ** 2).mean(1).cpu().numpy()
 
-# порог = 99-й перцентиль на норме val-серверов
+# порог = 99-й перцентиль на отложенной норме train-серверов (Xes веса не подгоняла, только ранняя остановка);
+# FPR и полнота — на val-серверах, которых модель не видела, поэтому FPR не равен 1% по построению
 vl = va.label.values
-thr = np.percentile(score(Xva[vl == 0]), 99)
-iso = IsolationForest(n_estimators=300, random_state=0).fit(Xn)
+thr = np.percentile(score(Xes), 99)
+iso = IsolationForest(n_estimators=300, random_state=0).fit(Xfit)
 iso_s = lambda X: -iso.score_samples(X)
-iso_thr = np.percentile(iso_s(Xva[vl == 0]), 99)
+iso_thr = np.percentile(iso_s(Xes), 99)
 
 res = {}
 for name, s, t in [("autoencoder", score(Xva), thr), ("isolation_forest", iso_s(Xva), iso_thr)]:
@@ -61,7 +63,7 @@ for name, s, t in [("autoencoder", score(Xva), thr), ("isolation_forest", iso_s(
     r["recall_all"] = float(pred[vl == 1].mean())
     res[name] = r
 df = pd.DataFrame(res).round(3)
-print(df.to_string()); df.to_markdown = None
+print(df.to_string())
 
 # ONNX + параметры для инференса
 torch.onnx.export(model.cpu(), torch.zeros(1, d), "model_v1.onnx", input_names=["x"], output_names=["recon"],

@@ -2,10 +2,10 @@
 import numpy as np
 import pandas as pd
 
+# Портов в журнале веб-сервера нет, поэтому и признака «портов на IP», и сценария сканирования портов здесь нет.
 FEATURES = ["req_count", "uniq_ips", "error_rate_4xx", "error_rate_5xx", "path_entropy",
-            "ua_entropy", "new_ip_ratio", "failed_login_count", "distinct_ports_per_ip"]
-ANOMALIES = ["port_scan", "brute_force", "traffic_spike", "path_scanning",
-             "credential_stuffing", "slow_exfiltration"]
+            "ua_entropy", "new_ip_ratio", "failed_login_count"]
+ANOMALIES = ["brute_force", "traffic_spike", "path_scanning", "credential_stuffing", "slow_exfiltration"]
 EPS = 0.1
 
 
@@ -33,15 +33,12 @@ def normal_window(p, r):
         error_rate_5xx=np.clip(r.normal(p["e5"], 0.005), 0, 1),
         path_entropy=p["path_entropy_mean"] + 0.3 * (0.7 * load + 0.71 * r.normal()), ua_entropy=r.normal(p["ua_entropy_mean"], 0.2),
         new_ip_ratio=np.clip(p["new_ip"] + 0.05 * (0.7 * load + 0.71 * r.normal()), 0, 1),
-        failed_login_count=float(r.poisson(p["logins"])), distinct_ports_per_ip=1.0)
+        failed_login_count=float(r.poisson(p["logins"])))
 
 
 def inject(w, kind, r):
     u = r.uniform
-    if kind == "port_scan":
-        w["distinct_ports_per_ip"] = u(15, 200); w["uniq_ips"] = max(1, w["uniq_ips"] * u(0.1, 0.3))
-        w["new_ip_ratio"] = u(0.7, 1.0)
-    elif kind == "brute_force":
+    if kind == "brute_force":
         w["failed_login_count"] = u(50, 500); w["uniq_ips"] = max(1, w["uniq_ips"] * u(0.05, 0.2))
         w["error_rate_4xx"] = min(1, w["error_rate_4xx"] + u(0.3, 0.6))
     elif kind == "traffic_spike":
